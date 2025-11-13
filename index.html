@@ -1,47 +1,479 @@
-// Uniswap V3 shared contracts
-const UNISWAP_V3_FACTORY =
-  "0x1F98431c8aD98523631AE4a59f267346ea31F984"; // v3 factory di banyak chain
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Uniswap V3/V4 – LP Position Checker + USD Rewards (On-chain)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    /* === sama seperti versi UI modern sebelumnya, aku singkat di sini === */
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 16px;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top, #1e293b 0, #020617 40%, #000 100%);
+      color: #e5e7eb;
+    }
+    .shell { width: 100%; max-width: 720px; }
+    .card {
+      background: rgba(15, 23, 42, 0.9);
+      border-radius: 20px;
+      padding: 20px 18px 22px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7);
+      border: 1px solid rgba(148, 163, 184, 0.25);
+      backdrop-filter: blur(18px);
+    }
+    .card-header { display: flex; justify-content: space-between; gap: 12px; align-items: center; margin-bottom: 10px; }
+    .title { font-size: 18px; font-weight: 600; }
+    .subtitle { font-size: 12px; color: #9ca3af; margin-top: 4px; }
+    .pill-row { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+    .pill {
+      font-size: 11px; padding: 4px 10px; border-radius: 999px;
+      border: 1px solid rgba(129, 140, 248, 0.7);
+      background: linear-gradient(135deg, rgba(129, 140, 248, 0.18), rgba(56, 189, 248, 0.08));
+      color: #e5e7eb; display: inline-flex; align-items: center; gap: 4px;
+    }
+    .pill span.dot { width: 6px; height: 6px; border-radius: 50%; background: #22c55e; }
+    label { display: block; font-size: 12px; font-weight: 500; margin-top: 12px; margin-bottom: 3px; color: #e5e7eb; }
+    select, input {
+      width: 100%; padding: 9px 11px; border-radius: 12px;
+      border: 1px solid rgba(75, 85, 99, 0.9);
+      background: rgba(15, 23, 42, 0.8);
+      color: #e5e7eb; font-size: 13px; outline: none;
+      transition: border 0.12s, box-shadow 0.12s, background 0.12s;
+    }
+    select:focus, input:focus {
+      border-color: #6366f1;
+      box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.45);
+      background: rgba(15, 23, 42, 1);
+    }
+    .hint { font-size: 11px; color: #9ca3af; margin-top: 2px; }
+    button {
+      margin-top: 18px; width: 100%; padding: 10px 14px;
+      border-radius: 999px; border: none; font-weight: 600; font-size: 14px;
+      cursor: pointer; background: linear-gradient(135deg, #6366f1, #22c55e);
+      color: #0b1020; box-shadow: 0 14px 30px rgba(79, 70, 229, 0.45);
+      transition: transform 0.12s, box-shadow 0.12s, filter 0.12s;
+    }
+    button:hover { filter: brightness(1.07); transform: translateY(-1px); box-shadow: 0 18px 40px rgba(79, 70, 229, 0.55); }
+    button:active { transform: translateY(0); box-shadow: 0 10px 22px rgba(79, 70, 229, 0.4); }
+    .result-wrapper {
+      margin-top: 18px; border-radius: 14px;
+      border: 1px solid rgba(30, 64, 175, 0.8);
+      background: radial-gradient(circle at top left, rgba(59, 130, 246, 0.25), transparent 60%);
+      padding: 10px 10px 12px;
+    }
+    .result-header { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 6px; }
+    .result-title { font-size: 13px; font-weight: 600; color: #e5e7eb; }
+    .status-tags { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+    .tag {
+      font-size: 10px; text-transform: uppercase; letter-spacing: 0.03em;
+      padding: 2px 7px; border-radius: 999px; border: 1px solid;
+    }
+    .tag.ok { border-color: rgba(34, 197, 94, 0.6); color: #bbf7d0; background: rgba(22, 101, 52, 0.6); }
+    .tag.bad { border-color: rgba(248, 113, 113, 0.6); color: #fecaca; background: rgba(127, 29, 29, 0.6); }
+    .tag.neutral { border-color: rgba(148, 163, 184, 0.7); color: #e5e7eb; background: rgba(30, 64, 175, 0.3); }
+    .result-quick { font-size: 11px; color: #cbd5f5; margin-bottom: 4px; }
+    .usd-line { font-size: 11px; color: #a5f3fc; margin-bottom: 6px; }
+    pre {
+      margin: 0; margin-top: 4px; background: rgba(15, 23, 42, 0.9);
+      color: #bbf7d0; padding: 10px 10px; border-radius: 10px;
+      font-size: 11px; font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      overflow-x: auto; border: 1px solid rgba(15, 23, 42, 0.9);
+    }
+    .footer { margin-top: 10px; font-size: 10px; color: #9ca3af; text-align: right; }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="title">Uniswap V3/V4 – LP Position Checker</div>
+          <div class="subtitle">Cek liquidity & reward (V3) + estimasi USD reward full on-chain (pool USDC).</div>
+        </div>
+        <div class="pill-row">
+          <div class="pill"><span class="dot"></span> On-chain Only</div>
+          <div class="pill">V3 Rewards · V4 Liquidity</div>
+        </div>
+      </div>
 
-const NONFUNGIBLE_POSITION_MANAGER =
-  "0xC36442b4a4522E871399CD717aBDD847Ab11FE88"; // NFT posisi V3 di semua chain
+      <label for="chain">Chain</label>
+      <select id="chain">
+        <option value="ethereum">Ethereum</option>
+        <option value="arbitrum">Arbitrum</option>
+        <option value="optimism">Optimism</option>
+        <option value="polygon">Polygon</option>
+        <option value="base">Base</option>
+      </select>
 
-// USDC native di masing-masing chain
-const USDC_ADDRESSES: Record<ChainKey, string> = {
-  ethereum: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",     // Ethereum mainnet 
-  arbitrum: "0xAf88d065e77c8cC2239327C5EDb3A432268e5831",   // Arbitrum native USDC 
-  optimism: "0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85",   // Optimism native USDC 
-  polygon:  "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359",   // Polygon PoS native USDC 
-  base:     "0x833589fCD6EdB6E08f4c7c32D4f71B54bDa02913",   // Base native USDC 
-};
+      <label for="version">Version</label>
+      <select id="version">
+        <option value="v3">Uniswap V3</option>
+        <option value="v4">Uniswap V4</option>
+      </select>
 
-// Auto-RPC per chain (tanpa input manual di UI)
-const CHAIN_CONFIG: Record<
-  ChainKey,
-  { name: string; rpcUrl: string; explorer: string }
-> = {
-  ethereum: {
-    name: "Ethereum",
-    rpcUrl: "https://eth.llamarpc.com",       // bisa ganti ke Alchemy/Infura kalau punya key
-    explorer: "https://etherscan.io",
-  },
-  arbitrum: {
-    name: "Arbitrum",
-    rpcUrl: "https://arb1.arbitrum.io/rpc",
-    explorer: "https://arbiscan.io",
-  },
-  optimism: {
-    name: "Optimism",
-    rpcUrl: "https://mainnet.optimism.io",
-    explorer: "https://optimistic.etherscan.io",
-  },
-  polygon: {
-    name: "Polygon",
-    rpcUrl: "https://polygon-rpc.com",
-    explorer: "https://polygonscan.com",
-  },
-  base: {
-    name: "Base",
-    rpcUrl: "https://mainnet.base.org",
-    explorer: "https://basescan.org",
-  },
-};
+      <label for="tokenId">LP NFT Token ID</label>
+      <input id="tokenId" placeholder="Contoh: 123456" />
+      <div class="hint">TokenId NFT posisi LP. Tool ini read-only (nggak bisa ubah posisi).</div>
+
+      <button id="checkBtn">Check Position</button>
+
+      <div id="resultBox" class="result-wrapper" style="display:none;">
+        <div class="result-header">
+          <div class="result-title">Ringkasan Posisi</div>
+          <div class="status-tags" id="statusTags"></div>
+        </div>
+        <div class="result-quick" id="quickSummary"></div>
+        <div class="usd-line" id="usdSummary"></div>
+        <pre id="resultJson">{}</pre>
+      </div>
+
+      <div class="footer">
+        * Estimasi USD pakai harga dari pool token/USDC di Uniswap V3 (jika ada). Liquidity → USD belum dihitung penuh di versi ini.
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+  <script>
+    const { ethers } = window;
+
+    // RPC (bisa ganti kalau mau node sendiri)
+    const RPC = {
+      ethereum: "https://rpc.ankr.com/eth",
+      arbitrum: "https://arb1.arbitrum.io/rpc",
+      optimism: "https://mainnet.optimism.io",
+      polygon:  "https://polygon-rpc.com",
+      base:     "https://developer-access-mainnet.base.org",
+    };
+
+    // NFPM v3
+    const NFPM_V3 = {
+      ethereum: "0xC36442b4a4522E871399CD717aBDD847Ab11FE88",
+      arbitrum: "0xC36442b4a4522E871399CD717aBDD847Ab11FE88",
+      optimism: "0xC36442b4a4522E871399CD717aBDD847Ab11FE88",
+      polygon:  "0xC36442b4a4522E871399CD717aBDD847Ab11FE88",
+      base:     "0x03a520b32C04BF3bEEf7BEb72E919cf822Ed34f1", // dari Base deployments Uniswap
+    };
+
+    // V3 Factory (per chain – aku isi Ethereum & Base; lainnya bisa kamu lengkapi)
+    const V3_FACTORY = {
+      ethereum: "0x1F98431c8aD98523631AE4a59f267346ea31F984",
+      base:     "0x33128a8fC17869897dcE68Ed026d694621f6FDfD",
+      // optimism / arbitrum / polygon: isi dari docs Uniswap kalau mau full
+    };
+
+    // USDC per chain
+    const USDC = {
+      ethereum: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+      base:     "0x833589fCD6eD6e08f4c7C32d4f71B54bDa02913",
+      // isi chain lain kalau perlu
+    };
+
+    // ERC20 ABI minimal
+    const ERC20_ABI = [
+      "function decimals() view returns (uint8)",
+      "function symbol() view returns (string)",
+    ];
+
+    // V3 bits
+    const ABI_V3 = [
+      "function positions(uint256 tokenId) view returns (" +
+      "uint96,address,address,address,uint24,int24,int24,uint128," +
+      "uint256,uint256,uint128,uint128)"
+    ];
+
+    // Factory & Pool ABI untuk harga on-chain
+    const V3_FACTORY_ABI = [
+      "function getPool(address tokenA, address tokenB, uint24 fee) view returns (address)"
+    ];
+
+    const V3_POOL_ABI = [
+      "function slot0() view returns (uint160 sqrtPriceX96,int24 tick,uint16,uint16,uint16,uint8,bool)",
+      "function token0() view returns (address)",
+      "function token1() view returns (address)"
+    ];
+
+    // V4 PosManager (tetap sama)
+    const POSM_V4 = {
+      ethereum: "0x000000000022D473030F116dDEE9F6B43aC78A5A",
+      arbitrum: "0x000000000022D473030F116dDEE9F6B43aC78A5A",
+      optimism: "0x000000000022D473030F116dDEE9F6B43aC78A5A",
+      polygon:  "0x000000000022D473030F116dDEE9F6B43aC78A5A",
+      base:     "0x000000000022D473030F116dDEE9F6B43aC78A5A",
+    };
+
+    const ABI_V4 = [
+      "function getPositionLiquidity(uint256 tokenId) view returns (uint128)",
+      "function getPoolAndPositionInfo(uint256 tokenId) view returns (" +
+        "tuple(address currency0,address currency1,uint24 fee,int24 tickSpacing,address hooks) poolKey," +
+        "uint256 positionInfo)"
+    ];
+
+    const chainLabels = {
+      ethereum: "Ethereum",
+      arbitrum: "Arbitrum",
+      optimism: "Optimism",
+      polygon:  "Polygon",
+      base:     "Base",
+    };
+
+    const resultBox   = document.getElementById("resultBox");
+    const resultJson  = document.getElementById("resultJson");
+    const quickSummary = document.getElementById("quickSummary");
+    const usdSummary  = document.getElementById("usdSummary");
+    const statusTags  = document.getElementById("statusTags");
+
+    function setStatusTags({ hasLiquidity, hasRewards, version }) {
+      statusTags.innerHTML = "";
+      const tag = (text, cls) => {
+        const el = document.createElement("span");
+        el.className = "tag " + cls;
+        el.textContent = text;
+        statusTags.appendChild(el);
+      };
+      tag(version.toUpperCase(), "neutral");
+      if (hasLiquidity === true) tag("HAS LIQUIDITY", "ok");
+      if (hasLiquidity === false) tag("NO LIQUIDITY", "bad");
+      if (version === "v3") {
+        if (hasRewards === true) tag("HAS REWARD", "ok");
+        if (hasRewards === false) tag("NO REWARD SEEN", "neutral");
+      } else {
+        tag("REWARD VIA SDK/SUBGRAPH", "neutral");
+      }
+    }
+
+    const nf = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 });
+
+    async function getTokenMeta(provider, address) {
+      const c = new ethers.Contract(address, ERC20_ABI, provider);
+      const [dec, sym] = await Promise.all([c.decimals(), c.symbol()]);
+      return { decimals: dec, symbol: sym };
+    }
+
+    async function getTokenPriceUsdFromPool(provider, chain, token) {
+      const usdcAddr = USDC[chain];
+      const factoryAddr = V3_FACTORY[chain];
+      if (!usdcAddr || !factoryAddr) return null;
+
+      // kalau token = USDC → harga 1
+      if (token.toLowerCase() === usdcAddr.toLowerCase()) {
+        return 1;
+      }
+
+      const factory = new ethers.Contract(factoryAddr, V3_FACTORY_ABI, provider);
+
+      // coba fee 0.05% dulu, kalau nggak ada baru 0.3%
+      const feeTiers = [500, 3000];
+      let poolAddr = ethers.constants.AddressZero;
+      let feeUsed = null;
+
+      for (const fee of feeTiers) {
+        const p = await factory.getPool(token, usdcAddr, fee);
+        if (p !== ethers.constants.AddressZero) {
+          poolAddr = p;
+          feeUsed = fee;
+          break;
+        }
+      }
+
+      if (poolAddr === ethers.constants.AddressZero) {
+        return null; // nggak ada pool token/USDC di fee-tier tadi
+      }
+
+      const pool = new ethers.Contract(poolAddr, V3_POOL_ABI, provider);
+      const [slot0, poolToken0, poolToken1, metaToken, metaUSDC] = await Promise.all([
+        pool.slot0(),
+        pool.token0(),
+        pool.token1(),
+        getTokenMeta(provider, token),
+        getTokenMeta(provider, usdcAddr),
+      ]);
+
+      const sqrtPriceX96 = slot0[0];
+      const priceX96Squared = sqrtPriceX96.mul(sqrtPriceX96); // BigNumber
+      const Q192 = ethers.BigNumber.from(2).pow(192);
+
+      // token0/token1 di pool bisa kebalik, jadi cek posisi
+      let price; // dalam USDC per token
+      if (token.toLowerCase() === poolToken0.toLowerCase()) {
+        // priceToken = (sqrtP^2 / 2^192) * 10^(dec0 - dec1)
+        const ratio = priceX96Squared.mul(
+          ethers.BigNumber.from(10).pow(metaToken.decimals)
+        ).div(
+          Q192.mul(ethers.BigNumber.from(10).pow(metaUSDC.decimals))
+        );
+        price = parseFloat(ratio.toString());
+      } else if (token.toLowerCase() === poolToken1.toLowerCase()) {
+        // priceToken = 1 / priceToken1InToken0
+        const ratio = priceX96Squared.mul(
+          ethers.BigNumber.from(10).pow(metaUSDC.decimals)
+        ).div(
+          Q192.mul(ethers.BigNumber.from(10).pow(metaToken.decimals))
+        );
+        const raw = parseFloat(ratio.toString());
+        if (raw === 0) return null;
+        price = 1 / raw;
+      } else {
+        return null;
+      }
+
+      return price;
+    }
+
+    document.getElementById("checkBtn").addEventListener("click", async () => {
+      const chain   = document.getElementById("chain").value;
+      const version = document.getElementById("version").value;
+      const tokenId = document.getElementById("tokenId").value.trim();
+
+      if (!tokenId) {
+        alert("Masukkan NFT tokenId dulu.");
+        return;
+      }
+
+      const rpcUrl = RPC[chain];
+      resultBox.style.display = "block";
+      quickSummary.textContent = "Query on-chain…";
+      usdSummary.textContent = "";
+      resultJson.textContent = "// fetching…";
+
+      try {
+        const provider = new ethers.providers.JsonRpcProvider(rpcUrl);
+
+        if (version === "v3") {
+          const nfpmAddr = NFPM_V3[chain];
+          const nfpm = new ethers.Contract(nfpmAddr, ABI_V3, provider);
+          const pos = await nfpm.positions(tokenId);
+
+          const token0 = pos[2];
+          const token1 = pos[3];
+          const feeTier = pos[4];
+          const tickLower = pos[5];
+          const tickUpper = pos[6];
+          const liquidity = pos[7];
+          const tokensOwed0 = pos[10];
+          const tokensOwed1 = pos[11];
+
+          const hasLiquidity = liquidity.gt(0);
+          const hasRewards = tokensOwed0.gt(0) || tokensOwed1.gt(0);
+
+          const data = {
+            version: "v3",
+            chain: chainLabels[chain] || chain,
+            tokenId,
+            token0,
+            token1,
+            feeTier: feeTier.toString(),
+            tickLower: tickLower.toString(),
+            tickUpper: tickUpper.toString(),
+            liquidity: liquidity.toString(),
+            hasLiquidity,
+            tokensOwed0: tokensOwed0.toString(),
+            tokensOwed1: tokensOwed1.toString(),
+            hasUnclaimedRewards: hasRewards,
+          };
+
+          setStatusTags({ hasLiquidity, hasRewards, version });
+
+          quickSummary.textContent = hasLiquidity
+            ? `Posisi V3 di ${data.chain} masih aktif (liquidity > 0).`
+            : `Posisi V3 di ${data.chain} tampaknya tidak punya liquidity (liquidity = 0).`;
+
+          // ======= Estimasi USD Reward (kalau bisa) =======
+          let usdLine = "Estimasi USD reward tidak tersedia (nggak ketemu pool token/USDC yang cocok).";
+
+          try {
+            const [meta0, meta1] = await Promise.all([
+              getTokenMeta(provider, token0),
+              getTokenMeta(provider, token1),
+            ]);
+
+            // amount dalam float human-readable
+            const amt0 = parseFloat(ethers.utils.formatUnits(tokensOwed0, meta0.decimals));
+            const amt1 = parseFloat(ethers.utils.formatUnits(tokensOwed1, meta1.decimals));
+
+            let price0 = null, price1 = null;
+            if (amt0 > 0) price0 = await getTokenPriceUsdFromPool(provider, chain, token0);
+            if (amt1 > 0) price1 = await getTokenPriceUsdFromPool(provider, chain, token1);
+
+            let rewardUsd0 = null, rewardUsd1 = null, totalUsd = 0;
+
+            if (amt0 > 0 && price0 != null) {
+              rewardUsd0 = amt0 * price0;
+              totalUsd += rewardUsd0;
+            }
+            if (amt1 > 0 && price1 != null) {
+              rewardUsd1 = amt1 * price1;
+              totalUsd += rewardUsd1;
+            }
+
+            if (totalUsd > 0) {
+              const parts = [];
+              if (rewardUsd0 != null) {
+                parts.push(`${meta0.symbol}: ~${nf.format(rewardUsd0)}`);
+              }
+              if (rewardUsd1 != null) {
+                parts.push(`${meta1.symbol}: ~${nf.format(rewardUsd1)}`);
+              }
+              usdLine = `Estimasi reward (on-chain price via token/USDC pool): ${parts.join(" + ")} ≈ ${nf.format(totalUsd)} total.`;
+            }
+          } catch (e) {
+            console.warn("Gagal hitung USD reward:", e);
+          }
+
+          usdSummary.textContent = usdLine;
+          resultJson.textContent = JSON.stringify(data, null, 2);
+          return;
+        }
+
+        // ================= V4 =================
+        if (version === "v4") {
+          const posmAddr = POSM_V4[chain];
+          const posm = new ethers.Contract(posmAddr, ABI_V4, provider);
+          const liquidity = await posm.getPositionLiquidity(tokenId);
+          const poolInfo = await posm.getPoolAndPositionInfo(tokenId);
+          const poolKey  = poolInfo[0];
+
+          const hasLiquidity = liquidity.gt(0);
+
+          const data = {
+            version: "v4",
+            chain: chainLabels[chain] || chain,
+            tokenId,
+            liquidity: liquidity.toString(),
+            hasLiquidity,
+            pool: {
+              token0: poolKey.currency0,
+              token1: poolKey.currency1,
+              fee: poolKey.fee,
+              tickSpacing: poolKey.tickSpacing,
+              hooks: poolKey.hooks,
+            },
+            note: "Uniswap V4 belum expose tokensOwed on-chain; reward biasanya dihitung via SDK/subgraph + off-chain indexer.",
+          };
+
+          setStatusTags({ hasLiquidity, hasRewards: null, version });
+
+          quickSummary.textContent = hasLiquidity
+            ? `Posisi V4 di ${data.chain} masih punya liquidity.`
+            : `Posisi V4 di ${data.chain} kemungkinan sudah tidak aktif (liquidity = 0).`;
+
+          usdSummary.textContent = "Untuk V4, perkiraan USD reward perlu SDK/subgraph (nggak bisa 100% on-chain-only dari 1 view).";
+          resultJson.textContent = JSON.stringify(data, null, 2);
+          return;
+        }
+      } catch (err) {
+        setStatusTags({ hasLiquidity: null, hasRewards: null, version: document.getElementById("version").value });
+        quickSummary.textContent = "Terjadi error saat query on-chain.";
+        usdSummary.textContent = "";
+        resultJson.textContent = "Error: " + (err.reason || err.message || String(err));
+      }
+    });
+  </script>
+</body>
+</html>
