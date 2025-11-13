@@ -1,0 +1,47 @@
+// Uniswap V3 shared contracts
+const UNISWAP_V3_FACTORY =
+  "0x1F98431c8aD98523631AE4a59f267346ea31F984"; // v3 factory di banyak chain
+
+const NONFUNGIBLE_POSITION_MANAGER =
+  "0xC36442b4a4522E871399CD717aBDD847Ab11FE88"; // NFT posisi V3 di semua chain
+
+// USDC native di masing-masing chain
+const USDC_ADDRESSES: Record<ChainKey, string> = {
+  ethereum: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",     // Ethereum mainnet 
+  arbitrum: "0xAf88d065e77c8cC2239327C5EDb3A432268e5831",   // Arbitrum native USDC 
+  optimism: "0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85",   // Optimism native USDC 
+  polygon:  "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359",   // Polygon PoS native USDC 
+  base:     "0x833589fCD6EdB6E08f4c7c32D4f71B54bDa02913",   // Base native USDC 
+};
+
+// Auto-RPC per chain (tanpa input manual di UI)
+const CHAIN_CONFIG: Record<
+  ChainKey,
+  { name: string; rpcUrl: string; explorer: string }
+> = {
+  ethereum: {
+    name: "Ethereum",
+    rpcUrl: "https://eth.llamarpc.com",       // bisa ganti ke Alchemy/Infura kalau punya key
+    explorer: "https://etherscan.io",
+  },
+  arbitrum: {
+    name: "Arbitrum",
+    rpcUrl: "https://arb1.arbitrum.io/rpc",
+    explorer: "https://arbiscan.io",
+  },
+  optimism: {
+    name: "Optimism",
+    rpcUrl: "https://mainnet.optimism.io",
+    explorer: "https://optimistic.etherscan.io",
+  },
+  polygon: {
+    name: "Polygon",
+    rpcUrl: "https://polygon-rpc.com",
+    explorer: "https://polygonscan.com",
+  },
+  base: {
+    name: "Base",
+    rpcUrl: "https://mainnet.base.org",
+    explorer: "https://basescan.org",
+  },
+};
